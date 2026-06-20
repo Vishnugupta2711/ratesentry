@@ -108,3 +108,65 @@ typings/
 # Logs and temp files
 *.log
 *.tmp
+
+# Editor swap / lock files
+*~
+.lock
+.coverage
+
+
+# Project-specific sensitive files and generated artifacts
+# user-data / infra bootstrap scripts (may contain account IDs, endpoints, credentials)
+userdata.sh
+
+# Generated test / load reports
+locust_report.html
+
+# Virtualenvs and Python env artifacts (sometimes created inside the repo)
+venv/
+env/
+.venv/
+
+# OS files
+.DS_Store
+
+# Ignore local credentials files and IDE state
+.env.local
+*.local
+
+
+# Local docker override files (may include secrets)
+docker-compose.override.yml
+docker-compose.*.local
+
+# Environment and secret files
+.env
+.env.*
+*.env
+secret-*.sh
+secrets.*
+*.secret
+
+# AWS credentials
+.aws/credentials
+.aws/config
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_dsa
+id_ecdsa
+
+# GPG / signing keys
+*.asc
+*.gpg
+
+# Terraform state
+.terraform/
+*.tfstate
+*.tfstate.*
