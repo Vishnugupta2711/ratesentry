@@ -1,0 +1,1542 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RateSentry — Distributed Rate Limiter</title>
+    <style>
+      :root {
+        --navy: #0a0f1e;
+        --navy-2: #111827;
+        --navy-3: #1e2a3a;
+        --accent: #00d4aa;
+        --accent-dim: rgba(0, 212, 170, 0.12);
+        --accent-dim2: rgba(0, 212, 170, 0.06);
+        --red: #ff4d4d;
+        --red-dim: rgba(255, 77, 77, 0.12);
+        --amber: #f59e0b;
+        --amber-dim: rgba(245, 158, 11, 0.12);
+        --text-1: #f0f4f8;
+        --text-2: #94a3b8;
+        --text-3: #475569;
+        --border: rgba(255, 255, 255, 0.08);
+        --border-accent: rgba(0, 212, 170, 0.3);
+        --mono: "JetBrains Mono", "Fira Code", monospace;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: var(--navy);
+        color: var(--text-1);
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+
+      /* NAV */
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 40px;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        background: rgba(10, 15, 30, 0.95);
+        backdrop-filter: blur(12px);
+        z-index: 100;
+      }
+      .nav-logo {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.3px;
+        color: var(--accent);
+      }
+      .nav-logo span {
+        color: var(--text-2);
+        font-weight: 400;
+      }
+      .nav-links {
+        display: flex;
+        gap: 28px;
+        list-style: none;
+      }
+      .nav-links a {
+        color: var(--text-2);
+        text-decoration: none;
+        font-size: 13px;
+        transition: color 0.15s;
+      }
+      .nav-links a:hover {
+        color: var(--text-1);
+      }
+      .nav-badge {
+        background: var(--accent-dim);
+        color: var(--accent);
+        border: 1px solid var(--border-accent);
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      /* HERO */
+      .hero {
+        padding: 100px 40px 80px;
+        max-width: 900px;
+        margin: 0 auto;
+        text-align: center;
+      }
+      .hero-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--accent-dim);
+        border: 1px solid var(--border-accent);
+        color: var(--accent);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 32px;
+        letter-spacing: 0.5px;
+      }
+      .hero-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .hero h1 {
+        font-size: clamp(36px, 6vw, 64px);
+        font-weight: 700;
+        letter-spacing: -2px;
+        line-height: 1.1;
+        margin-bottom: 20px;
+        color: var(--text-1);
+      }
+      .hero h1 span {
+        color: var(--accent);
+      }
+      .hero-sub {
+        font-size: 17px;
+        color: var(--text-2);
+        max-width: 560px;
+        margin: 0 auto 48px;
+        line-height: 1.7;
+      }
+      .hero-stats {
+        display: flex;
+        justify-content: center;
+        gap: 48px;
+        margin-bottom: 52px;
+        flex-wrap: wrap;
+      }
+      .stat {
+        text-align: center;
+      }
+      .stat-num {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: -1px;
+        font-family: var(--mono);
+      }
+      .stat-label {
+        font-size: 12px;
+        color: var(--text-3);
+        margin-top: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .hero-cta {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #0a0f1e;
+        padding: 12px 28px;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .btn-primary:hover {
+        opacity: 0.85;
+      }
+      .btn-secondary {
+        background: transparent;
+        color: var(--text-1);
+        padding: 12px 28px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.15s;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .btn-secondary:hover {
+        background: var(--navy-3);
+      }
+
+      /* SECTION */
+      section {
+        padding: 80px 40px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      .section-label {
+        font-size: 11px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .section-title {
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+      .section-sub {
+        font-size: 15px;
+        color: var(--text-2);
+        max-width: 560px;
+        line-height: 1.7;
+        margin-bottom: 48px;
+      }
+      .divider {
+        height: 1px;
+        background: var(--border);
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      /* DEMO */
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 700px) {
+        .demo-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .card-title {
+        font-size: 11px;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+        font-weight: 500;
+      }
+
+      .metric-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 600px) {
+        .metric-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      .metric {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .metric-val {
+        font-size: 26px;
+        font-weight: 700;
+        font-family: var(--mono);
+        letter-spacing: -1px;
+      }
+      .metric-val.green {
+        color: var(--accent);
+      }
+      .metric-val.red {
+        color: var(--red);
+      }
+      .metric-val.amber {
+        color: var(--amber);
+      }
+      .metric-val.white {
+        color: var(--text-1);
+      }
+      .metric-lbl {
+        font-size: 11px;
+        color: var(--text-3);
+        margin-top: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+
+      /* CONTROLS */
+      .control-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .control-row label {
+        font-size: 12px;
+        color: var(--text-2);
+        width: 100px;
+        flex-shrink: 0;
+      }
+      .control-row input[type="range"] {
+        flex: 1;
+        accent-color: var(--accent);
+      }
+      .control-row .val {
+        font-size: 13px;
+        font-weight: 600;
+        font-family: var(--mono);
+        color: var(--accent);
+        width: 60px;
+        text-align: right;
+      }
+      .btn-demo {
+        width: 100%;
+        padding: 11px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid;
+        margin-top: 8px;
+        transition: all 0.15s;
+      }
+      .btn-start {
+        background: var(--accent);
+        color: #0a0f1e;
+        border-color: var(--accent);
+      }
+      .btn-start:hover {
+        opacity: 0.85;
+      }
+      .btn-stop {
+        background: transparent;
+        color: var(--red);
+        border-color: var(--red);
+      }
+      .btn-stop:hover {
+        background: var(--red-dim);
+      }
+      .btn-reset {
+        background: transparent;
+        color: var(--text-2);
+        border-color: var(--border);
+        margin-top: 6px;
+      }
+      .btn-reset:hover {
+        background: var(--navy-3);
+      }
+
+      /* USER BARS */
+      .user-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .user-bar-name {
+        font-size: 11px;
+        color: var(--text-2);
+        font-family: var(--mono);
+        width: 50px;
+        flex-shrink: 0;
+      }
+      .user-bar-track {
+        flex: 1;
+        height: 6px;
+        background: var(--navy-3);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .user-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition:
+          width 0.3s,
+          background 0.3s;
+      }
+      .user-bar-count {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--text-3);
+        width: 40px;
+        text-align: right;
+      }
+
+      /* LOG */
+      .log-box {
+        background: var(--navy);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        height: 220px;
+        overflow-y: auto;
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+      .log-box::-webkit-scrollbar {
+        width: 4px;
+      }
+      .log-box::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .log-box::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+      .log-entry {
+        display: flex;
+        gap: 10px;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+      .log-time {
+        color: var(--text-3);
+        flex-shrink: 0;
+      }
+      .log-user {
+        color: #7dd3fc;
+        flex-shrink: 0;
+        width: 55px;
+      }
+      .log-200 {
+        color: var(--accent);
+        flex-shrink: 0;
+        width: 35px;
+      }
+      .log-429 {
+        color: var(--red);
+        flex-shrink: 0;
+        width: 35px;
+      }
+      .log-meta {
+        color: var(--text-3);
+      }
+
+      /* NODES */
+      .node-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 600px) {
+        .node-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .node-card {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+      }
+      .node-card.redis {
+        border-color: rgba(245, 158, 11, 0.3);
+        background: var(--amber-dim);
+      }
+      .node-name {
+        font-size: 10px;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .node-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        flex-shrink: 0;
+      }
+      .node-dot.amber {
+        background: var(--amber);
+      }
+      .node-rps {
+        font-size: 24px;
+        font-weight: 700;
+        font-family: var(--mono);
+        color: var(--text-1);
+        letter-spacing: -1px;
+      }
+      .node-rps.amber {
+        color: var(--amber);
+      }
+      .node-unit {
+        font-size: 10px;
+        color: var(--text-3);
+        margin-top: 2px;
+      }
+
+      /* ARCH */
+      .arch-flow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .arch-box {
+        background: var(--navy-3);
+        border: 1px solid var(--border);
+        padding: 7px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-1);
+      }
+      .arch-box.accent {
+        border-color: var(--border-accent);
+        background: var(--accent-dim);
+        color: var(--accent);
+      }
+      .arch-arrow {
+        color: var(--text-3);
+        font-size: 14px;
+      }
+
+      /* HOW IT WORKS */
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 700px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
+      .step {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+      }
+      .step-num {
+        font-size: 11px;
+        color: var(--accent);
+        font-family: var(--mono);
+        font-weight: 600;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .step-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .step-body {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.65;
+      }
+      .code-snip {
+        background: var(--navy);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #7dd3fc;
+        margin-top: 10px;
+        line-height: 1.7;
+        overflow-x: auto;
+      }
+
+      /* TECH STACK */
+      .stack-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .stack-item {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .stack-icon {
+        font-size: 20px;
+        margin-bottom: 8px;
+      }
+      .stack-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 3px;
+      }
+      .stack-role {
+        font-size: 11px;
+        color: var(--text-3);
+      }
+
+      /* BENCHMARKS */
+      .bench-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+      .bench-item {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+      }
+      .bench-val {
+        font-size: 28px;
+        font-weight: 700;
+        font-family: var(--mono);
+        color: var(--accent);
+        letter-spacing: -1px;
+      }
+      .bench-label {
+        font-size: 11px;
+        color: var(--text-3);
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+
+      /* INTERVIEW */
+      .qa-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .qa-item {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+      }
+      .qa-q {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--amber);
+        margin-bottom: 8px;
+      }
+      .qa-a {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.65;
+      }
+
+      /* FOOTER */
+      footer {
+        padding: 40px;
+        text-align: center;
+        border-top: 1px solid var(--border);
+        color: var(--text-3);
+        font-size: 13px;
+      }
+      footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      /* STATUS indicator */
+      .api-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 16px;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-3);
+      }
+      .status-dot.online {
+        background: var(--accent);
+        animation: pulse 2s infinite;
+      }
+      .status-dot.offline {
+        background: var(--red);
+      }
+
+      .rps-badge {
+        background: var(--accent-dim);
+        color: var(--accent);
+        border: 1px solid var(--border-accent);
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-family: var(--mono);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="nav-logo">Rate<span>Sentry</span></div>
+      <ul class="nav-links">
+        <li><a href="#demo">Live demo</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#stack">Stack</a></li>
+        <li><a href="#benchmarks">Benchmarks</a></li>
+        <li>
+          <a
+            href="https://github.com/Vishnugupta2711/ratesentry"
+            target="_blank"
+            >GitHub</a
+          >
+        </li>
+      </ul>
+      <span class="nav-badge">AWS ap-south-1</span>
+    </nav>
+
+    <div class="hero">
+      <div class="hero-eyebrow">
+        <span class="hero-dot"></span>
+        Production deployment · AWS Mumbai
+      </div>
+      <h1>Distributed rate limiting<br /><span>at production scale</span></h1>
+      <p class="hero-sub">
+        A multi-node API gateway that enforces per-user request limits across
+        servers simultaneously using Redis Lua atomicity — the same pattern used
+        by Stripe, Cloudflare, and GitHub.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-num">237</div>
+          <div class="stat-label">requests/sec</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">14,245</div>
+          <div class="stat-label">load tested</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">70ms</div>
+          <div class="stat-label">p50 latency</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">0</div>
+          <div class="stat-label">race conditions</div>
+        </div>
+      </div>
+      <div class="hero-cta">
+        <a href="#demo" class="btn-primary">Try the live demo</a>
+        <a
+          href="https://github.com/Vishnugupta2711/ratesentry"
+          class="btn-secondary"
+          target="_blank"
+          >View source</a
+        >
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- LIVE DEMO -->
+    <section id="demo">
+      <div class="section-label">Interactive demo</div>
+      <div class="section-title">Watch rate limiting happen live</div>
+      <div class="section-sub">
+        Simulate concurrent users hitting the API. Watch the per-user quota fill
+        up and 429 blocks fire in real time.
+      </div>
+
+      <div class="metric-row">
+        <div class="metric">
+          <div class="metric-val white" id="m-total">0</div>
+          <div class="metric-lbl">Total requests</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val green" id="m-allowed">0</div>
+          <div class="metric-lbl">Allowed (200)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val red" id="m-blocked">0</div>
+          <div class="metric-lbl">Blocked (429)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val amber" id="m-latency">—</div>
+          <div class="metric-lbl">p50 latency</div>
+        </div>
+      </div>
+
+      <div class="node-row">
+        <div class="node-card">
+          <div class="node-name"><span class="node-dot"></span>EC2 Node 1</div>
+          <div class="node-rps" id="n1-rps">0</div>
+          <div class="node-unit">req/s</div>
+        </div>
+        <div class="node-card">
+          <div class="node-name"><span class="node-dot"></span>EC2 Node 2</div>
+          <div class="node-rps" id="n2-rps">0</div>
+          <div class="node-unit">req/s</div>
+        </div>
+        <div class="node-card redis">
+          <div class="node-name">
+            <span class="node-dot amber"></span>ElastiCache Redis
+          </div>
+          <div class="node-rps amber" id="redis-ops">0</div>
+          <div class="node-unit" style="color: var(--amber)">atomic ops/s</div>
+        </div>
+      </div>
+
+      <div class="demo-grid">
+        <div class="card">
+          <div class="card-title">Controls</div>
+          <div class="api-status">
+            <span class="status-dot online" id="api-dot"></span>
+            <span id="api-status-text"
+              >Simulation mode — connects to AWS when available</span
+            >
+          </div>
+          <div class="control-row">
+            <label>Users</label>
+            <input
+              type="range"
+              min="1"
+              max="15"
+              value="6"
+              step="1"
+              id="sl-users"
+              oninput="
+                document.getElementById('sl-users-out').textContent =
+                  this.value;
+                initUsers();
+              "
+            />
+            <span class="val" id="sl-users-out">6</span>
+          </div>
+          <div class="control-row">
+            <label>Rate limit</label>
+            <input
+              type="range"
+              min="5"
+              max="25"
+              value="10"
+              step="1"
+              id="sl-limit"
+              oninput="
+                document.getElementById('sl-limit-out').textContent =
+                  this.value + ' req/min'
+              "
+            />
+            <span class="val" id="sl-limit-out">10 req/min</span>
+          </div>
+          <div class="control-row">
+            <label>Speed</label>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              value="2"
+              step="1"
+              id="sl-speed"
+              oninput="
+                document.getElementById('sl-speed-out').textContent = [
+                  'slow',
+                  'normal',
+                  'fast',
+                  'burst',
+                  'extreme',
+                ][this.value - 1];
+                if (running) {
+                  clearInterval(simTimer);
+                  simTimer = setInterval(
+                    tick,
+                    speeds[parseInt(this.value) - 1],
+                  );
+                }
+              "
+            />
+            <span class="val" id="sl-speed-out">normal</span>
+          </div>
+          <button
+            class="btn-demo btn-start"
+            id="btn-start"
+            onclick="toggleSim()"
+          >
+            Start simulation
+          </button>
+          <button class="btn-demo btn-reset" onclick="resetSim()">Reset</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            Per-user quota <span class="rps-badge" id="rps-badge">0 RPS</span>
+          </div>
+          <div id="user-bars"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div
+          class="card-title"
+          style="display: flex; justify-content: space-between"
+        >
+          Request log
+          <span style="font-size: 11px; color: var(--text-3)" id="log-count"
+            >0 entries</span
+          >
+        </div>
+        <div class="log-box" id="log-box"></div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- HOW IT WORKS -->
+    <section id="how">
+      <div class="section-label">Engineering</div>
+      <div class="section-title">How it works</div>
+      <div class="section-sub">
+        Four layers working together to make distributed rate limiting atomic,
+        consistent, and fast.
+      </div>
+
+      <div class="arch-flow" style="margin-bottom: 40px">
+        <span class="arch-box">Client</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-box accent">AWS ALB</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-box">FastAPI node 1</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-box accent">ElastiCache Redis</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-box">Lua script (atomic)</span>
+        <span class="arch-arrow">→</span>
+        <span class="arch-box">200 or 429</span>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01 — Algorithm</div>
+          <div class="step-title">Sliding window counter</div>
+          <div class="step-body">
+            Maintains a time-ordered log of request timestamps per user in Redis
+            sorted sets. Expired timestamps outside the 60-second window are
+            pruned on every check — the window slides with the clock,
+            eliminating the burst loophole at fixed window boundaries.
+          </div>
+          <div class="code-snip">
+            ZREMRANGEBYSCORE key 0 (now - 60s)<br />count = ZCARD key<br />if
+            count &lt; limit: ZADD key now now
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02 — Atomicity</div>
+          <div class="step-title">Lua script in Redis</div>
+          <div class="step-body">
+            The check-and-increment is a single Lua script executed server-side
+            in Redis. No other command can interrupt between the read (ZCARD)
+            and write (ZADD). This makes race conditions structurally impossible
+            — not just unlikely — regardless of how many concurrent requests
+            arrive.
+          </div>
+          <div class="code-snip">
+            -- Runs atomically inside Redis<br />local count =
+            redis.call('ZCARD', key)<br />if count &lt; max then<br />&nbsp;&nbsp;redis.call('ZADD',
+            key, now, now)<br />&nbsp;&nbsp;return 1 -- allowed<br />end<br />return
+            0 -- blocked
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03 — Distribution</div>
+          <div class="step-title">Shared state across nodes</div>
+          <div class="step-body">
+            All FastAPI nodes connect to the same ElastiCache Redis cluster. A
+            user's counter lives in Redis — not in any node's memory. Node 1 and
+            Node 2 always agree on how many requests a user has made, even if
+            every alternate request hits a different node.
+          </div>
+          <div class="code-snip">
+            Node 1 → Redis: user_A count = 8<br />Node 2 → Redis: user_A count =
+            9<br />Node 1 → Redis: user_A count = 10<br />Node 2 → Redis:
+            BLOCKED (limit=10)
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">04 — Resilience</div>
+          <div class="step-title">Fail-open design</div>
+          <div class="step-body">
+            If Redis becomes unreachable, RateSentry fails open — requests are
+            allowed through rather than returning 500 errors. A CloudWatch alarm
+            fires within 30 seconds. ElastiCache replica auto-promotes if the
+            primary fails. The API never goes down because Redis went down.
+          </div>
+          <div class="code-snip">
+            try:<br />&nbsp;&nbsp;return redis.lua_check(key)<br />except
+            RedisError:<br />&nbsp;&nbsp;cloudwatch.alarm("redis-down")<br />&nbsp;&nbsp;return
+            True # fail-open
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- STACK -->
+    <section id="stack">
+      <div class="section-label">Technology</div>
+      <div class="section-title">Tech stack</div>
+      <div class="section-sub">
+        Every tool chosen deliberately — not for resume padding, but because it
+        was the right solution to a specific engineering problem.
+      </div>
+
+      <div class="stack-grid">
+        <div class="stack-item">
+          <div class="stack-icon">🐍</div>
+          <div class="stack-name">Python 3.11</div>
+          <div class="stack-role">Core language + asyncio</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">⚡</div>
+          <div class="stack-name">FastAPI</div>
+          <div class="stack-role">HTTP middleware layer</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">🔴</div>
+          <div class="stack-name">Redis + Lua</div>
+          <div class="stack-role">Atomic distributed counter</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">🐳</div>
+          <div class="stack-name">Docker</div>
+          <div class="stack-role">Containerisation</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">☁️</div>
+          <div class="stack-name">AWS EC2</div>
+          <div class="stack-role">Compute nodes</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">🗄️</div>
+          <div class="stack-name">ElastiCache</div>
+          <div class="stack-role">Managed Redis cluster</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">⚖️</div>
+          <div class="stack-name">AWS ALB</div>
+          <div class="stack-role">Load balancer</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">📊</div>
+          <div class="stack-name">Prometheus + Grafana</div>
+          <div class="stack-role">Observability</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">🦗</div>
+          <div class="stack-name">Locust</div>
+          <div class="stack-role">Load testing</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- BENCHMARKS -->
+    <section id="benchmarks">
+      <div class="section-label">Load test results</div>
+      <div class="section-title">Benchmark results</div>
+      <div class="section-sub">
+        Tested with Locust — 100 concurrent users, 60 second sustained run
+        against AWS deployment.
+      </div>
+
+      <div class="bench-grid">
+        <div class="bench-item">
+          <div class="bench-val">237</div>
+          <div class="bench-label">RPS throughput</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">14,245</div>
+          <div class="bench-label">Total requests</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">70ms</div>
+          <div class="bench-label">p50 latency</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">170ms</div>
+          <div class="bench-label">p95 latency</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">420ms</div>
+          <div class="bench-label">p99 latency</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">5,710</div>
+          <div class="bench-label">Limits enforced</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">0</div>
+          <div class="bench-label">Race conditions</div>
+        </div>
+        <div class="bench-item">
+          <div class="bench-val">12/12</div>
+          <div class="bench-label">Tests passing</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- INTERVIEW Q&A -->
+    <section>
+      <div class="section-label">Engineering depth</div>
+      <div class="section-title">The decisions behind the design</div>
+      <div class="section-sub">
+        Every architectural choice was made for a specific reason — not
+        cargo-culted from a tutorial.
+      </div>
+
+      <div class="qa-list">
+        <div class="qa-item">
+          <div class="qa-q">Why Lua scripts instead of Redis transactions?</div>
+          <div class="qa-a">
+            Redis MULTI/EXEC transactions don't support conditional logic — you
+            can't check a value and conditionally write based on it inside a
+            transaction. Lua scripts run server-side with full scripting
+            capability and are atomic by design. ZCARD and ZADD must execute as
+            one operation — two separate calls create a TOCTOU race condition
+            where two simultaneous requests both see count=99, both proceed, and
+            the counter reaches 101. Lua makes this structurally impossible.
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Why sliding window instead of token bucket?</div>
+          <div class="qa-a">
+            Token bucket allows a burst at window boundaries — a user sends 100
+            requests at 11:59:59 and 100 more at 12:00:00, hitting 200 requests
+            in 2 seconds while technically never violating the per-minute rule
+            at any single moment. Sliding window measures any rolling 60-second
+            span continuously, eliminating this loophole entirely. The tradeoff
+            is memory — sorted sets store one entry per request vs one number
+            for token bucket — but at 100 req/user/min that's a trivial
+            overhead.
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">What happens if Redis goes down?</div>
+          <div class="qa-a">
+            Fail-open policy: if Redis is unreachable, requests are allowed
+            through rather than returning 500 errors. A CloudWatch alarm fires
+            within 30 seconds. ElastiCache replica auto-promotes to primary in
+            ~60 seconds if the primary fails. The reasoning: a brief window of
+            unlimited requests is acceptable downtime. Taking the entire API
+            offline because the rate limiter is down is not — especially when
+            the rate limiter sits in the critical path of every request.
+          </div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">How does it scale beyond 2 nodes?</div>
+          <div class="qa-a">
+            FastAPI nodes are completely stateless — no user data, no counters,
+            no session. Adding capacity is attaching more EC2 instances to the
+            ALB target group. Redis is the only stateful component: scale it
+            vertically (larger ElastiCache instance) or via Redis Cluster
+            sharding by user ID hash. At Google scale you'd add geographic
+            distribution — a user in Mumbai hits a Redis node in Mumbai, not
+            Virginia — but the application code doesn't change, only
+            infrastructure configuration.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <footer>
+      Built by
+      <a href="https://github.com/Vishnugupta2711" target="_blank"
+        >Vishnu Gupta</a
+      >
+      · B.Tech CSE, SRMIST Chennai (CGPA 9.47) ·
+      <a href="https://github.com/Vishnugupta2711/ratesentry" target="_blank"
+        >GitHub</a
+      >
+    </footer>
+
+    <script>
+      const speeds = [900, 400, 180, 70, 25];
+      const names = [
+        "alice",
+        "bob",
+        "carol",
+        "dave",
+        "eve",
+        "frank",
+        "grace",
+        "henry",
+        "ivan",
+        "judy",
+        "kevin",
+        "lisa",
+        "mike",
+        "nina",
+        "oscar",
+      ];
+      let running = false,
+        simTimer = null,
+        rpsTimer = null;
+      let total = 0,
+        allowed = 0,
+        blocked = 0,
+        latencies = [],
+        rpsCount = 0,
+        logCount = 0;
+      const users = {};
+
+      function getLimit() {
+        return parseInt(document.getElementById("sl-limit").value);
+      }
+      function getUsers() {
+        return names.slice(
+          0,
+          parseInt(document.getElementById("sl-users").value),
+        );
+      }
+      function getSpeed() {
+        return speeds[parseInt(document.getElementById("sl-speed").value) - 1];
+      }
+
+      function initUsers() {
+        getUsers().forEach((u) => {
+          if (!users[u]) users[u] = { window: [] };
+        });
+        renderBars();
+      }
+
+      function isAllowed(uid) {
+        const limit = getLimit(),
+          now = Date.now();
+        if (!users[uid]) users[uid] = { window: [] };
+        users[uid].window = users[uid].window.filter((t) => now - t < 60000);
+        if (users[uid].window.length < limit) {
+          users[uid].window.push(now);
+          return true;
+        }
+        return false;
+      }
+
+      function renderBars() {
+        const limit = getLimit();
+        const uids = getUsers().slice(0, 8);
+        document.getElementById("user-bars").innerHTML = uids
+          .map((u) => {
+            const now = Date.now();
+            const cnt = users[u]
+              ? users[u].window.filter((t) => now - t < 60000).length
+              : 0;
+            const pct = Math.min(100, Math.round((cnt / limit) * 100));
+            const over = cnt >= limit;
+            const col = over
+              ? "var(--red)"
+              : pct > 70
+                ? "var(--amber)"
+                : "var(--accent)";
+            return `<div class="user-bar-row">
+      <span class="user-bar-name">${u}</span>
+      <div class="user-bar-track"><div class="user-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      <span class="user-bar-count">${cnt}/${limit}</span>
+    </div>`;
+          })
+          .join("");
+      }
+
+      function addLog(uid, status, lat, node) {
+        const box = document.getElementById("log-box");
+        const now = new Date().toLocaleTimeString("en", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const cls = status === 200 ? "log-200" : "log-429";
+        const div = document.createElement("div");
+        div.className = "log-entry";
+        div.innerHTML = `<span class="log-time">${now}</span><span class="log-user">${uid}</span><span class="${cls}">${status}</span><span class="log-meta">${lat}ms · ${node}</span>`;
+        box.insertBefore(div, box.firstChild);
+        if (box.children.length > 80) box.removeChild(box.lastChild);
+        logCount++;
+        document.getElementById("log-count").textContent =
+          logCount + " entries";
+      }
+      // --- Live backend integration -------------------------------------------------
+      // apiMode can be 'sim' or 'live'
+      let apiMode = "sim";
+      // Use the page protocol to avoid mixed-content blocking on HTTPS pages
+      const ALB_URL =
+        location.protocol +
+        "//ratesentry-alb-734202522.ap-south-1.elb.amazonaws.com";
+      const NODE1 = "http://3.7.203.163:8000";
+      const NODE2 = "http://43.205.27.206:8000";
+
+      function setNodeStatus(nodeName, status) {
+        // status: 'online' | 'offline'
+        const cards = Array.from(document.querySelectorAll(".node-card"));
+        for (const card of cards) {
+          const nameEl = card.querySelector(".node-name");
+          if (!nameEl) continue;
+          if (nameEl.textContent.includes(nodeName)) {
+            const dot = nameEl.querySelector(".node-dot");
+            if (dot) {
+              dot.classList.remove("online", "offline");
+              dot.classList.add(status === "online" ? "online" : "offline");
+            }
+          }
+        }
+      }
+
+      async function checkAPIConnectivity() {
+        const timeoutMs = 3000;
+        const p1 = fetch(NODE1 + "/health", {
+          signal: AbortSignal.timeout
+            ? AbortSignal.timeout(timeoutMs)
+            : undefined,
+        }).catch((e) => e);
+        const p2 = fetch(NODE2 + "/health", {
+          signal: AbortSignal.timeout
+            ? AbortSignal.timeout(timeoutMs)
+            : undefined,
+        }).catch((e) => e);
+
+        const results = await Promise.allSettled([p1, p2]);
+
+        let anyUp = false;
+        if (
+          results[0].status === "fulfilled" &&
+          results[0].value &&
+          results[0].value.status === 200
+        ) {
+          setNodeStatus("EC2 Node 1", "online");
+          anyUp = true;
+        } else {
+          setNodeStatus("EC2 Node 1", "offline");
+        }
+        if (
+          results[1].status === "fulfilled" &&
+          results[1].value &&
+          results[1].value.status === 200
+        ) {
+          setNodeStatus("EC2 Node 2", "online");
+          anyUp = true;
+        } else {
+          setNodeStatus("EC2 Node 2", "offline");
+        }
+
+        const apiDot = document.getElementById("api-dot");
+        const apiText = document.getElementById("api-status-text");
+        if (anyUp) {
+          apiMode = "live";
+          if (apiDot) {
+            apiDot.classList.remove("offline");
+            apiDot.classList.add("online");
+            apiDot.style.background = "";
+          }
+          if (apiText) apiText.textContent = "Live mode — connected";
+        } else {
+          apiMode = "sim";
+          if (apiDot) {
+            apiDot.classList.remove("online");
+            apiDot.classList.add("offline");
+            apiDot.style.background = "var(--amber)";
+          }
+          if (apiText) apiText.textContent = "Simulation mode — offline";
+        }
+        return apiMode;
+      }
+
+      async function fireRealRequest(userId) {
+        const url = ALB_URL + "/api/data";
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const start = performance.now();
+        try {
+          const res = await fetch(url, {
+            method: "GET",
+            headers: { "X-User-ID": userId },
+            signal: controller.signal,
+          });
+          const end = performance.now();
+          clearTimeout(timeout);
+          const latencyMs = Math.round(end - start);
+
+          const remainingHeader =
+            res.headers.get("x-ratelimit-remaining") ||
+            res.headers.get("X-RateLimit-Remaining");
+          const remaining = remainingHeader
+            ? parseInt(remainingHeader, 10)
+            : null;
+
+          return {
+            status: res.status,
+            lat: latencyMs,
+            remaining: remaining,
+            node: "ALB",
+          };
+        } catch (err) {
+          clearTimeout(timeout);
+          return null;
+        }
+      }
+
+      // Run initial connectivity check and then every 5s
+      checkAPIConnectivity();
+      setInterval(checkAPIConnectivity, 5000);
+
+      // --- end live integration -----------------------------------------------------
+
+      function tick() {
+        const uids = getUsers();
+        const uid = uids[Math.floor(Math.random() * uids.length)];
+
+        // Helper to call simulation fallback
+        const callSim = async () => {
+          if (typeof fireSimRequest === "function") {
+            return await fireSimRequest(uid);
+          }
+          const ok = isAllowed(uid);
+          const lat = Math.round(55 + Math.random() * 50 + (ok ? 0 : 8));
+          const node = "Node " + (Math.random() > 0.5 ? "1" : "2");
+          return { status: ok ? 200 : 429, lat, remaining: null, node };
+        };
+
+        (async () => {
+          total++;
+          let res = null;
+          if (apiMode === "live") {
+            res = await fireRealRequest(uid);
+            if (res === null) {
+              res = await callSim();
+            }
+          } else {
+            res = await callSim();
+          }
+
+          if (res && res.status === 200) {
+            allowed++;
+          } else {
+            blocked++;
+          }
+          const lat = res ? res.lat : Math.round(55 + Math.random() * 50);
+          latencies.push(lat);
+          if (latencies.length > 300) latencies.shift();
+          rpsCount++;
+
+          addLog(uid, res ? res.status : 0, lat, res ? res.node : "sim");
+          updateMetrics();
+          renderBars();
+        })();
+      }
+
+      function updateMetrics() {
+        document.getElementById("m-total").textContent = total.toLocaleString();
+        document.getElementById("m-allowed").textContent =
+          allowed.toLocaleString();
+        document.getElementById("m-blocked").textContent =
+          blocked.toLocaleString();
+        if (latencies.length) {
+          const s = [...latencies].sort((a, b) => a - b);
+          document.getElementById("m-latency").textContent =
+            s[Math.floor(s.length * 0.5)] + "ms";
+        }
+      }
+
+      function updateNodes() {
+        const n1 = Math.round(rpsCount * 0.52),
+          n2 = Math.round(rpsCount * 0.48);
+        document.getElementById("n1-rps").textContent = n1;
+        document.getElementById("n2-rps").textContent = n2;
+        document.getElementById("redis-ops").textContent = rpsCount;
+        document.getElementById("rps-badge").textContent = rpsCount + " RPS";
+        rpsCount = 0;
+      }
+
+      function toggleSim() {
+        running = !running;
+        const btn = document.getElementById("btn-start");
+        if (running) {
+          btn.textContent = "Stop simulation";
+          btn.className = "btn-demo btn-stop";
+          initUsers();
+          simTimer = setInterval(tick, getSpeed());
+          rpsTimer = setInterval(updateNodes, 1000);
+        } else {
+          btn.textContent = "Start simulation";
+          btn.className = "btn-demo btn-start";
+          clearInterval(simTimer);
+          clearInterval(rpsTimer);
+          document.getElementById("n1-rps").textContent = 0;
+          document.getElementById("n2-rps").textContent = 0;
+          document.getElementById("redis-ops").textContent = 0;
+          document.getElementById("rps-badge").textContent = "0 RPS";
+        }
+      }
+
+      function resetSim() {
+        if (running) toggleSim();
+        total = allowed = blocked = rpsCount = logCount = 0;
+        latencies = [];
+        Object.keys(users).forEach((k) => delete users[k]);
+        document.getElementById("log-box").innerHTML = "";
+        document.getElementById("m-total").textContent = 0;
+        document.getElementById("m-allowed").textContent = 0;
+        document.getElementById("m-blocked").textContent = 0;
+        document.getElementById("m-latency").textContent = "—";
+        document.getElementById("rps-badge").textContent = "0 RPS";
+        document.getElementById("log-count").textContent = "0 entries";
+        document.getElementById("user-bars").innerHTML = "";
+      }
+
+      initUsers();
+    </script>
+  </body>
+</html>
