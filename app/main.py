@@ -19,19 +19,19 @@ app.add_middleware(
 
 # ── Redis ─────────────────────────────────────────────────────────────
 limiter = RedisRateLimiter(
-    max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 100)),
-    window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60)),
+    max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "100")),
+    window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
     redis_host=os.getenv("REDIS_HOST", "localhost"),
-    redis_port=int(os.getenv("REDIS_PORT", 6379)),
+    redis_port=int(os.getenv("REDIS_PORT", "6379")),
 )
 
 # ── Strict IP-level limiter (abuse protection) ────────────────────────
 # Separate limiter with tighter limits per IP regardless of user ID
 ip_limiter = RedisRateLimiter(
-    max_requests=int(os.getenv("IP_RATE_LIMIT", 300)),
+    max_requests=int(os.getenv("IP_RATE_LIMIT", "300")),
     window_seconds=60,
     redis_host=os.getenv("REDIS_HOST", "localhost"),
-    redis_port=int(os.getenv("REDIS_PORT", 6379)),
+    redis_port=int(os.getenv("REDIS_PORT", "6379")),
 )
 
 # ── Prometheus ────────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 # RateSentry — Distributed Rate Limiter & API Gateway
 
+[![RateSentry CI/CD Pipeline](https://github.com/Vishnugupta2711/ratesentry/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Vishnugupta2711/ratesentry/actions/workflows/ci-cd.yml)
+
 A production-grade distributed rate limiting system built in Python, deployed on AWS.
 
 ## What it does
@@ -39,6 +41,7 @@ Load tested with Locust — 100 concurrent users, 60 second run:
 | Rate limiting | Sliding window algorithm + threading.Lock |
 | Distributed state | Redis (sorted sets + Lua atomic scripts) |
 | Containerisation | Docker + Docker Compose |
+| CI/CD | GitHub Actions (Lint, Pytest + Redis service, Docker & AWS ECR deploy) |
 | Cloud compute | AWS EC2 t3.micro (Auto Scaling Group) |
 | Managed cache | AWS ElastiCache Redis 7.0 |
 | Load balancer | AWS Application Load Balancer |
@@ -59,26 +62,20 @@ Rate limit checks are I/O bound (Redis round-trip). asyncio cooperative multitas
 ## Project Structure
 ratesentry/
 
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml           # Automated CI/CD (lint, test, build, ECR deploy)
 ├── app/
-
 │   ├── main.py                 # FastAPI app + middleware
-
 │   ├── rate_limiter.py         # In-memory sliding window (Week 1)
-
 │   └── redis_rate_limiter.py   # Distributed Redis version (Week 2)
-
 ├── tests/
-
 │   ├── test_rate_limiter.py        # 6 unit tests
-
 │   └── test_redis_rate_limiter.py  # 6 distributed tests incl. subprocess
-
 ├── locustfile.py               # Load test configuration
-
 ├── Dockerfile                  # Production container
-
 ├── docker-compose.yml          # 3-node local stack
-
+├── pyproject.toml              # Pytest & Ruff linter configuration
 └── requirements.txt
 
 ## Running Locally

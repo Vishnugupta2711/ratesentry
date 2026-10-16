@@ -1,0 +1,124 @@
+name: RateSentry CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    name: Lint & Automated Tests
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Code Quality & Linting (Ruff)
+        run: |
+          ruff check app/ tests/
+
+      - name: Run Test Suite (Unit & Distributed Redis)
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: |
+          pytest tests/ -v
+
+  docker-verify:
+    name: Validate Docker Container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Container (Dry Run)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ratesentry:verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  cd:
+    name: Build & Push to Amazon ECR
+    needs: [ci, docker-verify]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify AWS Credentials Availability
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "::warning ::AWS_ACCESS_KEY_ID secret is not set in repository secrets. Skipping ECR deployment."
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS Credentials
+        if: steps.check-creds.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Log in to Amazon ECR
+        if: steps.check-creds.outputs.configured == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        if: steps.check-creds.outputs.configured == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build, Tag, and Push to Amazon ECR
+        if: steps.check-creds.outputs.configured == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/ratesentry:latest
+            ${{ steps.login-ecr.outputs.registry }}/ratesentry:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
